@@ -11,6 +11,7 @@ from models.basic_var import AdaLNBeforeHead, AdaLNSelfAttn
 from models.helpers import gumbel_softmax_with_rng, sample_with_top_k_top_p_
 from models.vqvae import VQVAE, VectorQuantizer2
 
+from mamba_ssm import Mamba
 
 class SharedAdaLin(nn.Linear):
     def forward(self, cond_BD):
@@ -56,7 +57,7 @@ class VAR(nn.Module):
         
         # 2. class embedding
         init_std = math.sqrt(1 / self.C / 3)
-        self.num_classes = num_classes
+        self.num_classes = 10 #num_classes
         self.uniform_prob = torch.full((1, num_classes), fill_value=1.0 / num_classes, dtype=torch.float32, device=dist.get_device())
         self.class_emb = nn.Embedding(self.num_classes + 1, self.C)
         nn.init.trunc_normal_(self.class_emb.weight.data, mean=0, std=init_std)
@@ -82,6 +83,8 @@ class VAR(nn.Module):
         norm_layer = partial(nn.LayerNorm, eps=norm_eps)
         self.drop_path_rate = drop_path_rate
         dpr = [x.item() for x in torch.linspace(0, drop_path_rate, depth)]  # stochastic depth decay rule (linearly increasing)
+        
+        '''
         self.blocks = nn.ModuleList([
             AdaLNSelfAttn(
                 cond_dim=self.D, shared_aln=shared_aln,
@@ -92,6 +95,17 @@ class VAR(nn.Module):
             )
             for block_idx in range(depth)
         ])
+        '''
+        self.blocks = nn.ModuleList([
+            Mamba(
+                d_model=self.C,  # Match embedding dimension
+                d_state=32,  # Internal state size
+                d_conv=8,  # Convolutional projection
+                expand=2,  # Expansion ratio
+            )
+            for _ in range(depth)
+        ])
+
         
         fused_add_norm_fns = [b.fused_add_norm_fn is not None for b in self.blocks]
         self.using_fused_add_norm_fn = any(fused_add_norm_fns)
@@ -108,8 +122,11 @@ class VAR(nn.Module):
         dT = d.transpose(1, 2)    # dT: 11L
         lvl_1L = dT[:, 0].contiguous()
         self.register_buffer('lvl_1L', lvl_1L)
+        
+        '''
         attn_bias_for_masking = torch.where(d >= dT, 0., -torch.inf).reshape(1, 1, self.L, self.L)
         self.register_buffer('attn_bias_for_masking', attn_bias_for_masking.contiguous())
+        '''
         
         # 6. classifier head
         self.head_nm = AdaLNBeforeHead(self.C, self.D, norm_layer=norm_layer)

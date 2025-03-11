@@ -82,6 +82,7 @@ def build_everything(args: arg_util.Args):
     from utils.amp_sc import AmpOptimizer
     from utils.lr_control import filter_params
     
+    '''
     vae_local, var_wo_ddp = build_vae_var(
         V=4096, Cvae=32, ch=160, share_quant_resi=4,        # hard-coded VQVAE hyperparameters
         device=dist.get_device(), patch_nums=args.patch_nums,
@@ -89,6 +90,18 @@ def build_everything(args: arg_util.Args):
         flash_if_available=args.fuse, fused_if_available=args.fuse,
         init_adaln=args.aln, init_adaln_gamma=args.alng, init_head=args.hd, init_std=args.ini,
     )
+    '''
+
+    vae_local, var_wo_ddp = build_vae_var(
+        V=4096, Cvae=32, ch=160, share_quant_resi=4,
+        device=dist.get_device(), patch_nums=args.patch_nums,
+        num_classes=num_classes, depth=args.depth,
+        shared_aln=args.saln, attn_l2_norm=args.anorm,
+        flash_if_available=args.fuse, fused_if_available=args.fuse,
+        backbone="mamba",  # ✅ Add this to specify Mamba
+        init_adaln=args.aln, init_adaln_gamma=args.alng, init_head=args.hd, init_std=args.ini,
+    )
+
     
     vae_ckpt = 'vae_ch160v4096z32.pth'
     if dist.is_local_master():

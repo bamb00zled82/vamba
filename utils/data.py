@@ -28,9 +28,17 @@ def build_dataset(
     train_aug, val_aug = transforms.Compose(train_aug), transforms.Compose(val_aug)
     
     # build dataset
+    '''
     train_set = DatasetFolder(root=osp.join(data_path, 'train'), loader=pil_loader, extensions=IMG_EXTENSIONS, transform=train_aug)
     val_set = DatasetFolder(root=osp.join(data_path, 'val'), loader=pil_loader, extensions=IMG_EXTENSIONS, transform=val_aug)
     num_classes = 1000
+    '''
+    from torchvision.datasets import CIFAR10
+
+    train_set = CIFAR10(root="~/.torchvision/datasets", train=True, download=True, transform=train_aug)
+    val_set = CIFAR10(root="~/.torchvision/datasets", train=False, download=True, transform=val_aug)
+    num_classes = 10  # CIFAR-10 has 10 classes
+
     print(f'[Dataset] {len(train_set)=}, {len(val_set)=}, {num_classes=}')
     print_aug(train_aug, '[train]')
     print_aug(val_aug, '[val]')
