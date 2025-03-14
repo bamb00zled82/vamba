@@ -106,15 +106,7 @@ class VAR(nn.Module):
             for _ in range(depth)
         ])
 
-        
-        fused_add_norm_fns = [b.fused_add_norm_fn is not None for b in self.blocks]
-        self.using_fused_add_norm_fn = any(fused_add_norm_fns)
-        print(
-            f'\n[constructor]  ==== flash_if_available={flash_if_available} ({sum(b.attn.using_flash for b in self.blocks)}/{self.depth}), fused_if_available={fused_if_available} (fusing_add_ln={sum(fused_add_norm_fns)}/{self.depth}, fusing_mlp={sum(b.ffn.fused_mlp_func is not None for b in self.blocks)}/{self.depth}) ==== \n'
-            f'    [VAR config ] embed_dim={embed_dim}, num_heads={num_heads}, depth={depth}, mlp_ratio={mlp_ratio}\n'
-            f'    [drop ratios ] drop_rate={drop_rate}, attn_drop_rate={attn_drop_rate}, drop_path_rate={drop_path_rate:g} ({torch.linspace(0, drop_path_rate, depth)})',
-            end='\n\n', flush=True
-        )
+    
         
         # 5. attention mask used in training (for masking out the future)
         #    it won't be used in inference, since kv cache is enabled
@@ -173,7 +165,7 @@ class VAR(nn.Module):
         cur_L = 0
         f_hat = sos.new_zeros(B, self.Cvae, self.patch_nums[-1], self.patch_nums[-1])
         
-        for b in self.blocks: b.attn.kv_caching(True)
+
         for si, pn in enumerate(self.patch_nums):   # si: i-th segment
             ratio = si / self.num_stages_minus_1
             # last_L = cur_L
@@ -203,7 +195,7 @@ class VAR(nn.Module):
                 next_token_map = self.word_embed(next_token_map) + lvl_pos[:, cur_L:cur_L + self.patch_nums[si+1] ** 2]
                 next_token_map = next_token_map.repeat(2, 1, 1)   # double the batch sizes due to CFG
         
-        for b in self.blocks: b.attn.kv_caching(False)
+
         return self.vae_proxy[0].fhat_to_img(f_hat).add_(1).mul_(0.5)   # de-normalize, from [-1, 1] to [0, 1]
     
     def forward(self, label_B: torch.LongTensor, x_BLCv_wo_first_l: torch.Tensor) -> torch.Tensor:  # returns logits_BLV
@@ -223,7 +215,7 @@ class VAR(nn.Module):
             else: x_BLC = torch.cat((sos, self.word_embed(x_BLCv_wo_first_l.float())), dim=1)
             x_BLC += self.lvl_embed(self.lvl_1L[:, :ed].expand(B, -1)) + self.pos_1LC[:, :ed] # lvl: BLC;  pos: 1LC
         
-        attn_bias = self.attn_bias_for_masking[:, :, :ed, :ed]
+
         cond_BD_or_gss = self.shared_ada_lin(cond_BD)
         
         # hack: get the dtype if mixed precision is used
@@ -234,9 +226,6 @@ class VAR(nn.Module):
         cond_BD_or_gss = cond_BD_or_gss.to(dtype=main_type)
         attn_bias = attn_bias.to(dtype=main_type)
         
-        AdaLNSelfAttn.forward
-        for i, b in enumerate(self.blocks):
-            x_BLC = b(x=x_BLC, cond_BD=cond_BD_or_gss, attn_bias=attn_bias)
         x_BLC = self.get_logits(x_BLC.float(), cond_BD)
         
         if self.prog_si == 0:
@@ -280,16 +269,14 @@ class VAR(nn.Module):
                 self.head[-1].weight.data.mul_(init_head)
                 self.head[-1].bias.data.zero_()
         
-        if isinstance(self.head_nm, AdaLNBeforeHead):
-            self.head_nm.ada_lin[-1].weight.data.mul_(init_adaln)
-            if hasattr(self.head_nm.ada_lin[-1], 'bias') and self.head_nm.ada_lin[-1].bias is not None:
-                self.head_nm.ada_lin[-1].bias.data.zero_()
+       
         
         depth = len(self.blocks)
         for block_idx, sab in enumerate(self.blocks):
-            sab: AdaLNSelfAttn
-            sab.attn.proj.weight.data.div_(math.sqrt(2 * depth))
-            sab.ffn.fc2.weight.data.div_(math.sqrt(2 * depth))
+            if isinstance(sab, Mamba):  # Only apply initialization to Mamba layers
+                nn.init.xavier_uniform_(sab.W.weight)  # Xavier initialization
+                nn.init.zeros_(sab.b.weight)
+
             if hasattr(sab.ffn, 'fcg') and sab.ffn.fcg is not None:
                 nn.init.ones_(sab.ffn.fcg.bias)
                 nn.init.trunc_normal_(sab.ffn.fcg.weight, std=1e-5)
