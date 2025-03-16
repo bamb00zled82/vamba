@@ -270,16 +270,19 @@ class VAR(nn.Module):
                 self.head[-1].bias.data.zero_()
         
        
-        
         depth = len(self.blocks)
         for block_idx, sab in enumerate(self.blocks):
-            if isinstance(sab, Mamba):  # Only apply initialization to Mamba layers
-                nn.init.xavier_uniform_(sab.W.weight)  # Xavier initialization
-                nn.init.zeros_(sab.b.weight)
+            if isinstance(sab, Mamba):  # Skip Mamba layers, they use their own initialization
+                continue  # Ensures Mamba is completely excluded from all the initializations below
+
+            # Apply Xavier initialization only to valid Transformer layers
+            if hasattr(sab, 'W') and hasattr(sab.W, 'weight'):
+                nn.init.xavier_uniform_(sab.W.weight)  
 
             if hasattr(sab.ffn, 'fcg') and sab.ffn.fcg is not None:
                 nn.init.ones_(sab.ffn.fcg.bias)
                 nn.init.trunc_normal_(sab.ffn.fcg.weight, std=1e-5)
+
             if hasattr(sab, 'ada_lin'):
                 sab.ada_lin[-1].weight.data[2*self.C:].mul_(init_adaln)
                 sab.ada_lin[-1].weight.data[:2*self.C].mul_(init_adaln_gamma)
@@ -288,6 +291,7 @@ class VAR(nn.Module):
             elif hasattr(sab, 'ada_gss'):
                 sab.ada_gss.data[:, :, 2:].mul_(init_adaln)
                 sab.ada_gss.data[:, :, :2].mul_(init_adaln_gamma)
+
     
     def extra_repr(self):
         return f'drop_path_rate={self.drop_path_rate:g}'
