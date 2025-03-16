@@ -144,8 +144,7 @@ class VectorQuantizer2(nn.Module):
         #assert patch_hws[-1][0] == H and patch_hws[-1][1] == W, f'{patch_hws[-1]=} != ({H=}, {W=})'
         if patch_hws[-1][0] != H or patch_hws[-1][1] != W:
             print(f"Warning: Patch size mismatch. Expected {patch_hws[-1]}, but got {(H, W)}")
-            H, W = patch_hws[-1]  # Adjust to expected size
-
+            H, W = patch_hws[-1] 
         
         SN = len(patch_hws)
         for si, (ph, pw) in enumerate(patch_hws): # from small to large
