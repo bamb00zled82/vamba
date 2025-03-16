@@ -22,7 +22,7 @@ class VQVAE(nn.Module):
         quant_resi=0.5,         # 0.5 means \phi(x) = 0.5conv(x) + (1-0.5)x
         share_quant_resi=4,     # use 4 \phi layers for K scales: partially-shared \phi
         default_qresi_counts=0, # if is 0: automatically set to len(v_patch_nums)
-        v_patch_nums=(1, 2, 3, 4, 5, 6, 8, 10, 13, 16), # number of patches for each scale, h_{1 to K} = w_{1 to K} = v_patch_nums[k]
+        v_patch_nums=(1, 2, 3, 4),#, 5, 6, 8, 10, 13, 16), # number of patches for each scale, h_{1 to K} = w_{1 to K} = v_patch_nums[k]
         test_mode=True,
     ):
         super().__init__()
