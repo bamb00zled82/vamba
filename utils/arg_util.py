@@ -65,7 +65,7 @@ class Args(Tap):
     fuse: bool = True       # whether to use fused op like flash attn, xformers, fused MLP, fused LayerNorm, etc.
     
     # data
-    pn: str = '1_2_3_4'
+    pn: str = '1_2_4_8'
     patch_size: int = 4
     patch_nums: tuple = None    # [automatically set; don't specify this] = tuple(map(int, args.pn.replace('-', '_').split('_')))
     resos: tuple = None         # [automatically set; don't specify this] = tuple(pn * args.patch_size for pn in args.patch_nums)
