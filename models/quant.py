@@ -163,7 +163,11 @@ class VectorQuantizer2(nn.Module):
             idx_Bhw = idx_N.view(B, ph, pw)
             h_BChw = F.interpolate(self.embedding(idx_Bhw).permute(0, 3, 1, 2), size=(H, W), mode='bicubic').contiguous() if (si != SN-1) else self.embedding(idx_Bhw).permute(0, 3, 1, 2).contiguous()
             h_BChw = self.quant_resi[si/(SN-1)](h_BChw)
+
+            # debugging purpose
+            print(f"Shape of f_hat: {f_hat.shape}, Shape of h_BChw: {h_BChw.shape}")
             f_hat.add_(h_BChw)
+            
             f_rest.sub_(h_BChw)
             f_hat_or_idx_Bl.append(f_hat.clone() if to_fhat else idx_N.reshape(B, ph*pw))
         
